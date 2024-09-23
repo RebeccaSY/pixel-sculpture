@@ -13,7 +13,7 @@
             left: 20px;
             width: 50px;
             height: 50px;
-            background-color: rgba(128, 128, 128, 0.5); /* Semi-transparent gray background */
+            background-color: rgba(128, 128, 128, 0.5);
             border: none;
             border-radius: 5px;
             cursor: pointer;
@@ -21,23 +21,33 @@
         }
         #backButton::before {
             content: "←";
-            color: white; /* White arrow */
+            color: white;
             font-size: 24px;
             text-align: center;
             line-height: 50px;
             display: block;
         }
+        #textDisplay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            display: none; /* Initially hidden */
+            font-size: 30px;
+        }
     </style>
 </head>
 <body>
     <button id="backButton"></button>
+    <div id="textDisplay">This is a room</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         const scene = new THREE.Scene();
         
         // Lower initial camera position
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const initialCameraPosition = { x: 0, y: -5, z: 50 };  // Lowered camera position
+        const initialCameraPosition = { x: 0, y: -5, z: 50 };
         camera.position.set(initialCameraPosition.x, initialCameraPosition.y, initialCameraPosition.z);
 
         const renderer = new THREE.WebGLRenderer();
@@ -46,29 +56,25 @@
 
         let cubes = [];
         const middleCubes = [];
-        const outerCubes = [];
         const rows = 5;
         const cols = 10;
         const cubeSize = 13;
 
-        // Define the color palette
         const paletteColors = [
-            0x3D4645,  // (61, 70, 69)
-            0x8F877D,  // (143, 135, 125)
-            0x9F8D7F,  // (159, 141, 127)
-            0x969188,  // (150, 145, 136)
-            0x81847E,  // (129, 132, 126)
-            0x595855   // (89, 88, 85)
+            0x4c6464,
+            0x866957,
+            0x938c84,
+            0xd7936c,
+            0xd0bba8,
+            0xb5c4bf
         ];
 
-        let colorIndex = 0;  // To iterate over the color palette
+        let colorIndex = 0;
 
         for (let i = 0; i < rows; i++) {
             for (let j = 0; j < cols; j++) {
                 const isMiddleCube = (i > 0 && i < rows - 1) && (j > 0 && j < cols - 1);
                 const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-
-                // Assign colors from the palette, looping through if necessary
                 const material = new THREE.MeshBasicMaterial({ color: paletteColors[colorIndex] });
                 const cube = new THREE.Mesh(geometry, material);
 
@@ -81,23 +87,39 @@
 
                 if (isMiddleCube) {
                     middleCubes.push(cube);
-                } else {
-                    outerCubes.push(cube);
                 }
 
-                // Increment and loop through the color palette
                 colorIndex = (colorIndex + 1) % paletteColors.length;
             }
         }
 
+        const pointGeometry = new THREE.BufferGeometry();
+        const pointCount = 1000;
+        const positions = new Float32Array(pointCount * 3);
+
+        for (let i = 0; i < pointCount; i++) {
+            const theta = Math.random() * 2 * Math.PI;
+            const phi = Math.acos(Math.random() * 2 - 1);
+            const x = 50 * Math.sin(phi) * Math.cos(theta);
+            const y = 50 * Math.sin(phi) * Math.sin(theta);
+            const z = 50 * Math.cos(phi);
+            positions.set([x, y, z], i * 3);
+        }
+
+        pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const pointMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5 });
+        const pointSphere = new THREE.Points(pointGeometry, pointMaterial);
+        scene.add(pointSphere);
+
         let selectedCube = null;
         let clickedCube = null;
         const backButton = document.getElementById('backButton');
+        const textDisplay = document.getElementById('textDisplay');
         let cameraMovingBack = false;
-        let interactionDisabled = false;  // New flag to disable interactions
+        let interactionDisabled = false;
 
         document.addEventListener('mousemove', (event) => {
-            if (interactionDisabled) return;  // Disable hover if interaction is disabled
+            if (interactionDisabled) return;
 
             const mouse = new THREE.Vector2();
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -117,8 +139,10 @@
             }
         });
 
+        const fontLoader = new THREE.FontLoader();
+
         document.addEventListener('click', (event) => {
-            if (interactionDisabled) return;  // Disable click if interaction is disabled
+            if (interactionDisabled) return;
 
             const mouse = new THREE.Vector2();
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -133,11 +157,60 @@
                 clickedCube.position.z = -1.2 * cubeSize;
 
                 selectedCube = clickedCube;
-                interactionDisabled = true;  // Disable further interactions
+                interactionDisabled = true;
 
                 backButton.style.display = 'block';
+
+                const number = middleCubes.indexOf(clickedCube) + 1;
+                fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+                    createNumberText(clickedCube, number, font);
+                });
             }
         });
+
+        function createNumberText(cube, number, font) {
+            const textGeometry = new THREE.TextGeometry(number.toString(), {
+                font: font,
+                size: 3,
+                height: 0.2,
+            });
+            const textMaterial = new THREE.MeshBasicMaterial({ color: 0xebedea });
+            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+            textMesh.position.set(cube.position.x-1, cube.position.y-0.6, cube.position.z + (cubeSize / 2) + 0.5); // Adjust position
+            textMesh.lookAt(cube.position.x-1, cube.position.y-0.6, cube.position.z + 10); // Make text face the camera
+            scene.add(textMesh);
+            textMesh.userData.cube = cube;
+            textMesh.userData.animation = false;
+
+            textMesh.callback = function() {
+                if (!this.userData.animation) {
+                    this.userData.animation = true;
+                    animateCubeAndDisplayText(cube);
+                }
+            };
+            textMesh.visible = true;
+        }
+
+        function animateCubeAndDisplayText(cube) {
+            const targetPosition = new THREE.Vector3(-window.innerWidth / 4, window.innerHeight / 4, 0);
+            const animationDuration = 1000;
+            let startTime = null;
+
+            function animate(time) {
+                if (!startTime) startTime = time;
+                const progress = (time - startTime) / animationDuration;
+
+                if (progress < 1) {
+                    cube.rotation.y += 0.05;
+                    cube.position.lerp(targetPosition, progress);
+                    requestAnimationFrame(animate);
+                } else {
+                    textDisplay.style.display = 'block';
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
 
         backButton.addEventListener('click', () => {
             selectedCube = null;
@@ -145,6 +218,7 @@
             cameraMovingBack = true;
 
             backButton.style.display = 'none';
+            textDisplay.style.display = 'none'; // Hide text
         });
 
         function animate() {
@@ -158,7 +232,7 @@
                 camera.position.lerp(new THREE.Vector3(initialCameraPosition.x, initialCameraPosition.y, initialCameraPosition.z), 0.05);
                 if (camera.position.distanceTo(new THREE.Vector3(initialCameraPosition.x, initialCameraPosition.y, initialCameraPosition.z)) < 0.1) {
                     cameraMovingBack = false;
-                    interactionDisabled = false;  // Re-enable interaction when camera is back
+                    interactionDisabled = false;
                 }
             }
 
